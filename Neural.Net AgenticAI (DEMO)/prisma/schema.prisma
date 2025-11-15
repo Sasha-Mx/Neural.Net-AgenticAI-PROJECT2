@@ -1,0 +1,102 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://postgres:postgres@postgres/app" // hardcoded because it's an internal docker connection
+}
+
+model User {
+  id             Int            @id @default(autoincrement())
+  name           String
+  email          String         @unique
+  hashedPassword String
+  avatarUrl      String?
+  createdAt      DateTime       @default(now())
+  campaigns      Campaign[]
+  brandProfiles  BrandProfile[]
+  campaignTemplates CampaignTemplate[]
+}
+
+model Campaign {
+  id          Int           @id @default(autoincrement())
+  userId      Int
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  brief       Json // { goal, tone, audience, etc. }
+  imageModel  String        @default("sdxl") // Open-source image model: sdxl, stable-diffusion-2-1, flux-schnell, etc.
+  status      String // 'generating', 'completed', 'failed'
+  isArchived  Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  templateId  Int?
+  template    CampaignTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  viewCount   Int               @default(0)
+  lastViewedAt DateTime?
+  assets      Asset[]
+  workflowLog WorkflowLog[]
+}
+
+model Asset {
+  id         Int      @id @default(autoincrement())
+  campaignId Int
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  type       String // 'image', 'text', 'video', 'email', 'social_media_post', 'ad_copy'
+  content    Json? // for structured content (text, social posts, ad copy, etc.)
+  url        String? // for image/video URLs
+  isSelected Boolean  @default(true) // for image selection feature
+  createdAt  DateTime @default(now())
+  exportCount     Int      @default(0)
+  lastExportedAt  DateTime?
+  viewCount       Int      @default(0)
+  lastViewedAt    DateTime?
+}
+
+model WorkflowLog {
+  id             Int      @id @default(autoincrement())
+  campaignId     Int
+  campaign       Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  agentName      String // e.g., 'WriterAgent', 'DesignerAgent', 'LegalAgent'
+  status         String // e.g., 'started', 'completed', 'validating'
+  durationMs     Int? // duration in milliseconds
+  inputPayload   Json? // what the agent received
+  outputPayload  Json? // what the agent produced
+  outputSummary  String? // human-readable summary
+  timestamp      DateTime @default(now())
+}
+
+model BrandProfile {
+  id                  Int      @id @default(autoincrement())
+  userId              Int
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                String
+  brandColorPrimary   String?
+  brandColorSecondary String?
+  visualStyle         String?
+  imageryPreference   String?
+  brandThemes         String?
+  fontFamily          String?
+  preferredImageModel String?  @default("sdxl") // Default image model for this brand
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
+
+model CampaignTemplate {
+  id                  Int        @id @default(autoincrement())
+  userId              Int?
+  user                User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name                String
+  description         String
+  category            String // 'product_launch', 'seasonal_sale', 'brand_awareness', etc.
+  defaultGoal         String
+  defaultTone         String
+  defaultAudience     String
+  defaultKeywords     String?
+  promptInstructions  String // Special instructions for AI agents when using this template
+  isDefault           Boolean    @default(false) // Whether this is a system default template
+  createdAt           DateTime   @default(now())
+  campaigns           Campaign[]
+}
